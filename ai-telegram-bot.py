@@ -2,71 +2,65 @@
 # -*- coding: utf-8 -*-
 
 import os
-import asyncio
 import logging
 import requests
-import nest_asyncio
-from aiohttp import web
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-================== CONFIG ==================
+# ================== الإعدادات ==================
+BOT_TOKEN = os.getenv("BOT_TOKEN")      # توكن البوت
+HF_TOKEN = os.getenv("HF_TOKEN")        # توكن HuggingFace
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") HF_TOKEN = os.getenv("HF_TOKEN") WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://xxxx.onrender.com/ PORT = int(os.getenv("PORT", "10000"))
+if not BOT_TOKEN or not HF_TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN أو HF_TOKEN غير موجود")
 
-if not BOT_TOKEN or not HF_TOKEN or not WEBHOOK_URL: raise RuntimeError("Set BOT_TOKEN, HF_TOKEN, WEBHOOK_URL")
-
-HF_MODEL = "tiiuae/falcon-7b-instruct"  # جيد للعربي + الانجليزي HF_API = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
-
-HEADERS = { "Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json", }
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 logging.basicConfig(level=logging.INFO)
 
-================== AI ==================
+# ================== الذكاء الاصطناعي ==================
+def ask_ai(text: str) -> str:
+    payload = {"inputs": text}
+    r = requests.post(HF_API_URL, headers=HEADERS, json=payload, timeout=60)
 
-def ai_reply(prompt: str) -> str: payload = { "inputs": prompt, "parameters": { "max_new_tokens": 300, "temperature": 0.7, "return_full_text": False, } } try: r = requests.post(HF_API, headers=HEADERS, json=payload, timeout=60) r.raise_for_status() data = r.json() if isinstance(data, list) and data: return data[0].get("generated_text", "❌ لم أستطع الرد") return "❌ رد غير متوقع" except Exception as e: return f"❌ خطأ: {e}"
+    if r.status_code != 200:
+        return "❌ خطأ من خادم الذكاء الاصطناعي"
 
-================== HANDLERS ==================
+    data = r.json()
+    if isinstance(data, list):
+        return data[0].get("generated_text", "❌ لا يوجد رد")
+    return "❌ لا يوجد رد"
 
-async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE): text = (update.message.text or "").strip() if not text: return
+# ================== Handlers ==================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🤖 أهلاً بك في بوت الذكاء الاصطناعي\n\n"
+        "✍️ اكتب أي سؤال أو طلب وسأرد عليك."
+    )
 
-await update.message.reply_text("🤖 أفكر...")
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    await update.message.reply_text("⏳ أفكر...")
 
-loop = asyncio.get_event_loop()
-reply = await loop.run_in_executor(None, ai_reply, text)
+    reply = ask_ai(user_text)
+    await update.message.reply_text(reply)
 
-await update.message.reply_text(reply)
+# ================== تشغيل البوت ==================
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-================== WEBHOOK ==================
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
-def main(): nest_asyncio.apply()
+    print("🤖 AI Bot is running...")
+    app.run_polling()
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
-
-async def tg_webhook(request):
-    data = await request.json()
-    update = Update.de_json(data, app.bot)
-    await app.update_queue.put(update)
-    return web.Response(text="ok")
-
-web_app = web.Application()
-web_app.router.add_post("/", tg_webhook)
-
-async def run():
-    await app.initialize()
-    await app.start()
-    await app.bot.set_webhook(WEBHOOK_URL)
-
-    runner = web.AppRunner(web_app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
-    logging.info("🚀 AI Bot Running (FREE)")
-    while True:
-        await asyncio.sleep(3600)
-
-asyncio.run(run())
-
-if name == "main": main()
+if __name__ == "__main__":
+    main()
