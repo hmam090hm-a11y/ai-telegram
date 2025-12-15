@@ -1,21 +1,14 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" Free AI Telegram Bot
-
-Chat only
-
-Arabic + English
-
-Uses HuggingFace Inference API (FREE)
-
-Webhook (Render compatible) """
-
-
-import os import asyncio import logging from aiohttp import web import nest_asyncio import requests
-
-from telegram import Update from telegram.ext import ( ApplicationBuilder, MessageHandler, ContextTypes, filters, )
+import os
+import asyncio
+import logging
+import requests
+import nest_asyncio
+from aiohttp import web
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 ================== CONFIG ==================
 
