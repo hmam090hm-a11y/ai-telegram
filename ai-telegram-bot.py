@@ -50,7 +50,7 @@ async def ask_ai(prompt: str) -> str:
     
     # payload مبسط وصحيح للتجربة
     payload = {
-        "model": "llama3.1-8b-instant",  # نموذج مضمون العمل
+        "model": "llama3-70b-8192",  # ← النموذج الكبير المضمون
         "messages": [
             {
                 "role": "user", 
