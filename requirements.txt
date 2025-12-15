@@ -1,4 +1,4 @@
 python-telegram-bot==20.8
-aiohttp
-requests
-gTTS
+aiohttp==3.9.0
+requests==2.31.0
+gTTS==2.4.0
